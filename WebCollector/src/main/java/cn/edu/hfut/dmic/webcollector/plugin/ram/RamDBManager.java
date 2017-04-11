@@ -69,13 +69,20 @@ public class RamDBManager extends DBManager {
 
     @Override
     public void inject(CrawlDatum datum, boolean force) throws Exception {
-        String key = datum.getKey();
+        String key = datum.key();
         if (!force) {
             if (ramDB.crawlDB.containsKey(key)) {
                 return;
             }
         }
         ramDB.crawlDB.put(key, datum);
+    }
+    
+    @Override
+    public void inject(CrawlDatums datums, boolean force) throws Exception {
+        for(CrawlDatum datum:datums){
+            inject(datum,force);
+        }
     }
 
     @Override
@@ -110,38 +117,19 @@ public class RamDBManager extends DBManager {
     }
 
     @Override
-    public void wrtieFetchSegment(CrawlDatum fetchDatum) throws Exception {
-        ramDB.fetchDB.put(fetchDatum.getKey(), fetchDatum);
+    public synchronized void writeFetchSegment(CrawlDatum fetchDatum) throws Exception {
+        ramDB.fetchDB.put(fetchDatum.key(), fetchDatum);
     }
 
     @Override
-    public void wrtieParseSegment(CrawlDatums parseDatums) throws Exception {
+    public synchronized void writeParseSegment(CrawlDatums parseDatums) throws Exception {
         for (CrawlDatum datum : parseDatums) {
-            ramDB.linkDB.put(datum.getKey(), datum);
+            ramDB.linkDB.put(datum.key(), datum);
         }
     }
 
     @Override
     public void closeSegmentWriter() throws Exception {
     }
-
-    @Override
-    public void lock() throws Exception {
-    }
-
-    @Override
-    public boolean isLocked() throws Exception {
-        return false;
-    }
-
-    @Override
-    public void unlock() throws Exception {
-    }
-
-    @Override
-    public void writeRedirectSegment(CrawlDatum datum, String realUrl) throws Exception {
-        String key = datum.getKey();
-        ramDB.redirectDB.put(key, realUrl);
-    }
-
+ 
 }

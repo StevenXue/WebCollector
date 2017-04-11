@@ -94,8 +94,8 @@ public class Links implements Iterable<String> {
      * 添加doc中，满足选择器的元素中的链接 选择器cssSelector必须定位到具体的超链接
      * 例如我们想抽取id为content的div中的所有超链接，这里 就要将cssSelector定义为div[id=content] a
      *
-     * @param doc
-     * @param cssSelector
+     * @param doc 网页Document
+     * @param cssSelector CSS选择器
      */
     public Links addBySelector(Document doc, String cssSelector) {
         Elements as = doc.select(cssSelector);
@@ -122,11 +122,24 @@ public class Links implements Iterable<String> {
     }
 
     public Links addByRegex(Document doc, RegexRule regexRule) {
+        return addByRegex(doc, regexRule, true);
+    }
+
+    public Links addByRegex(Document doc, RegexRule regexRule, boolean parseImg) {
         Elements as = doc.select("a[href]");
         for (Element a : as) {
             String href = a.attr("abs:href");
             if (regexRule.satisfy(href)) {
                 this.add(href);
+            }
+        }
+        if (parseImg) {
+            Elements imgs = doc.select("img[src]");
+            for (Element img : imgs) {
+                String src = img.attr("abs:src");
+                if (regexRule.satisfy(src)) {
+                    this.add(src);
+                }
             }
         }
         return this;
@@ -165,6 +178,5 @@ public class Links implements Iterable<String> {
     public String toString() {
         return dataList.toString();
     }
-    
-    
+
 }

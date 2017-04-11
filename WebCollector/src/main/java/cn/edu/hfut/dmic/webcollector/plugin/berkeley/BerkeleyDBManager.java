@@ -46,11 +46,10 @@ public class BerkeleyDBManager extends DBManager {
 
     Environment env;
     String crawlPath;
-    BerkeleyGenerator generator=null;
+    BerkeleyGenerator generator = null;
 
     public BerkeleyDBManager(String crawlPath) {
         this.crawlPath = crawlPath;
-        this.generator=new BerkeleyGenerator(crawlPath);
     }
 
     public void list() throws Exception {
@@ -78,7 +77,7 @@ public class BerkeleyDBManager extends DBManager {
     @Override
     public void inject(CrawlDatum datum, boolean force) throws Exception {
         Database database = env.openDatabase(null, "crawldb", BerkeleyDBUtils.defaultDBConfig);
-        DatabaseEntry key = BerkeleyDBUtils.strToEntry(datum.getKey());
+        DatabaseEntry key = BerkeleyDBUtils.strToEntry(datum.key());
         DatabaseEntry value = new DatabaseEntry();
         if (!force) {
             if (database.get(null, key, value, LockMode.DEFAULT) == OperationStatus.SUCCESS) {
@@ -88,7 +87,24 @@ public class BerkeleyDBManager extends DBManager {
         }
         value = BerkeleyDBUtils.strToEntry(CrawlDatumFormater.datumToJsonStr(datum));
         database.put(null, key, value);
-        database.sync();
+        database.close();
+    }
+
+    @Override
+    public void inject(CrawlDatums datums, boolean force) throws Exception {
+        Database database = env.openDatabase(null, "crawldb", BerkeleyDBUtils.defaultDBConfig);
+        for (int i = 0; i < datums.size(); i++) {
+            CrawlDatum datum = datums.get(i);
+            DatabaseEntry key = BerkeleyDBUtils.strToEntry(datum.key());
+            DatabaseEntry value = new DatabaseEntry();
+            if (!force) {
+                if (database.get(null, key, value, LockMode.DEFAULT) == OperationStatus.SUCCESS) {
+                    continue;
+                }
+            }
+            value = BerkeleyDBUtils.strToEntry(CrawlDatumFormater.datumToJsonStr(datum));
+            database.put(null, key, value);
+        }
         database.close();
     }
 
@@ -109,66 +125,44 @@ public class BerkeleyDBManager extends DBManager {
         env.close();
     }
 
-    public int BUFFER_SIZE = 20;
+    public int BUFFER_SIZE = 1;
     Database fetchDatabase = null;
     Database linkDatabase = null;
-    Database redirectDatabase = null;
 
     AtomicInteger count_fetch = new AtomicInteger(0);
     AtomicInteger count_link = new AtomicInteger(0);
-    AtomicInteger count_redirect = new AtomicInteger(0);
 
     @Override
     public void initSegmentWriter() throws Exception {
         fetchDatabase = env.openDatabase(null, "fetch", BerkeleyDBUtils.defaultDBConfig);
         linkDatabase = env.openDatabase(null, "link", BerkeleyDBUtils.defaultDBConfig);
-        redirectDatabase = env.openDatabase(null, "redirect", BerkeleyDBUtils.defaultDBConfig);
 
         count_fetch = new AtomicInteger(0);
         count_link = new AtomicInteger(0);
-        count_redirect = new AtomicInteger(0);
     }
 
     @Override
-    public void wrtieFetchSegment(CrawlDatum fetchDatum) throws Exception {
+    public void writeFetchSegment(CrawlDatum fetchDatum) throws Exception {
         BerkeleyDBUtils.writeDatum(fetchDatabase, fetchDatum);
-        if (count_fetch.incrementAndGet() % BUFFER_SIZE == 0) {
-            fetchDatabase.sync();
-        }
     }
 
-    @Override
-    public void writeRedirectSegment(CrawlDatum datum, String realUrl) throws Exception {
-        BerkeleyDBUtils.put(redirectDatabase, datum.getKey(), realUrl);
-        if (count_redirect.incrementAndGet() % BUFFER_SIZE == 0) {
-            redirectDatabase.sync();
-        }
-    }
 
     @Override
-    public void wrtieParseSegment(CrawlDatums parseDatums) throws Exception {
+    public void writeParseSegment(CrawlDatums parseDatums) throws Exception {
         for (CrawlDatum datum : parseDatums) {
             BerkeleyDBUtils.writeDatum(linkDatabase, datum);
-        }
-        if (count_link.incrementAndGet() % BUFFER_SIZE == 0) {
-            linkDatabase.sync();
         }
     }
 
     @Override
     public void closeSegmentWriter() throws Exception {
         if (fetchDatabase != null) {
-            fetchDatabase.sync();
             fetchDatabase.close();
         }
         if (linkDatabase != null) {
-            linkDatabase.sync();
             linkDatabase.close();
         }
-        if (redirectDatabase != null) {
-            redirectDatabase.sync();
-            redirectDatabase.close();
-        }
+       
     }
 
     @Override
@@ -198,7 +192,6 @@ public class BerkeleyDBManager extends DBManager {
         linkCursor.close();
         linkDatabase.close();
         LOG.info("end merge");
-        crawldbDatabase.sync();
         crawldbDatabase.close();
 
         env.removeDatabase(null, "fetch");
@@ -208,43 +201,6 @@ public class BerkeleyDBManager extends DBManager {
 
     }
 
-    Database lockDatabase;
-
-    @Override
-    public void lock() throws Exception {
-        lockDatabase = env.openDatabase(null, "lock", BerkeleyDBUtils.defaultDBConfig);
-        DatabaseEntry key = new DatabaseEntry("lock".getBytes("utf-8"));
-        DatabaseEntry value = new DatabaseEntry("locked".getBytes("utf-8"));
-        lockDatabase.put(null, key, value);
-        lockDatabase.sync();
-        lockDatabase.close();
-    }
-
-    @Override
-    public boolean isLocked() throws Exception {
-        boolean isLocked = false;
-        lockDatabase = env.openDatabase(null, "lock", BerkeleyDBUtils.defaultDBConfig);
-        DatabaseEntry key = new DatabaseEntry("lock".getBytes("utf-8"));
-        DatabaseEntry value = new DatabaseEntry();
-        if (lockDatabase.get(null, key, value, LockMode.DEFAULT) == OperationStatus.SUCCESS) {
-            String lockInfo = new String(value.getData(), "utf-8");
-            if (lockInfo.equals("locked")) {
-                isLocked = true;
-            }
-        }
-        lockDatabase.close();
-        return isLocked;
-    }
-
-    @Override
-    public void unlock() throws Exception {
-        lockDatabase = env.openDatabase(null, "lock", BerkeleyDBUtils.defaultDBConfig);
-        DatabaseEntry key = new DatabaseEntry("lock".getBytes("utf-8"));
-        DatabaseEntry value = new DatabaseEntry("unlocked".getBytes("utf-8"));
-        lockDatabase.put(null, key, value);
-        lockDatabase.sync();
-        lockDatabase.close();
-    }
 
     @Override
     public boolean isDBExists() {
@@ -262,6 +218,9 @@ public class BerkeleyDBManager extends DBManager {
 
     @Override
     public Generator getGenerator() {
+        if(generator==null){
+             generator = new BerkeleyGenerator(env);
+        }
         return generator;
     }
 

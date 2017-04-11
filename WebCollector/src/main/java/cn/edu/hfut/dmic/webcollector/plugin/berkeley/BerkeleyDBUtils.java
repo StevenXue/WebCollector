@@ -38,12 +38,12 @@ public class BerkeleyDBUtils {
     public static DatabaseConfig  createDefaultDBConfig(){
         DatabaseConfig databaseConfig=new DatabaseConfig();
         databaseConfig.setAllowCreate(true);
-        databaseConfig.setDeferredWrite(true);
+//        databaseConfig.setDeferredWrite(true);
         return databaseConfig;
     }
     
     public static void writeDatum(Database database,CrawlDatum datum) throws Exception{
-        String key=datum.getKey();
+        String key=datum.key();
         String value=CrawlDatumFormater.datumToJsonStr(datum);
         put(database,key,value);
     }

@@ -95,7 +95,7 @@ public class DemoBingCrawler extends RamCrawler {
                         .meta("rank", rank + "")
                         .meta("pageType", "outlink")
                         .meta("depth", (depth + 1) + "")
-                        .meta("referer", page.getUrl());
+                        .meta("referer", page.url());
                 next.add(datum);
             }
 
@@ -121,6 +121,10 @@ public class DemoBingCrawler extends RamCrawler {
 
     /**
      * 根据关键词和页号拼接Bing搜索对应的URL
+     * @param keyword 关键词
+     * @param pageNum 页号
+     * @return 对应的URL
+     * @throws Exception 异常 
      */
     public static String createBingUrl(String keyword, int pageNum) throws Exception {
         int first = pageNum * 10 - 9;
